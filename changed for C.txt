@@ -1,0 +1,54 @@
+int run_container(struct config cfg) {
+    // From mount_namespaces(7): Create mount namespace first
+    if (unshare(CLONE_NEWNS) < 0) {
+        perror("unshare CLONE_NEWNS");
+        return 1;
+    }
+    
+    // From mount(2): Make all mounts private (no host leak)
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) < 0) {
+        perror("mount MS_PRIVATE");
+        return 1;
+    }
+    
+    // PID namespace (already there)
+    if (unshare(CLONE_NEWPID) < 0) {
+        perror("unshare CLONE_NEWPID");
+        return 1;
+    }
+    
+    // UTS namespace for hostname (Question G/H)
+    if (unshare(CLONE_NEWUTS) < 0) {
+        perror("unshare CLONE_NEWUTS");
+        return 1;
+    }
+    
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+    if (pid == 0) {
+        // Child: Mount new /proc (fixes ps and df)
+        mkdir("/proc", 0755);
+        if (mount("proc", "/proc", "proc", 0, NULL) < 0) {
+            perror("mount /proc");
+            _exit(1);
+        }
+        
+        // Set hostname to container name
+        if (strlen(cfg.name) > 0) {
+            sethostname(cfg.name, strlen(cfg.name));
+        }
+        
+        printf("Running child with pid: %d\n", getpid());
+        execl("/bin/sh", "sh", "-c", cfg.command, NULL);
+        perror("execl");
+        _exit(1);
+    } else {
+        printf("[Parent] Child created with real-pid: %d (still in host namespace)\n", pid);
+        waitpid(pid, NULL, 0);
+        printf("[Parent] Done.\n");
+        return 0;
+    }
+}
