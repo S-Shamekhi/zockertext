@@ -1,0 +1,46 @@
+  if (pid == 0) {
+    char container_dir[256];
+    if (setup_container_dir(cont.id, container_dir) != 0) {
+      fprintf(stderr, "[ERR] Failed to setup container directory for %s\n",
+              cont.id);
+      return 1;
+    }
+
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) != 0) {
+      fprintf(stderr, "[ERR] Failed to change mount to private: %s\n",
+              strerror(errno));
+      return 1;
+    }
+
+    //   change the root to the container directory (part d)
+    if (chroot(container_dir) != 0) {
+      fprintf(stderr, "[ERR] Failed to chroot to %s: %s\n",
+              container_dir, strerror(errno));
+      return 1;
+    }
+
+    // Make sure we are actually in the new root directory
+    if (chdir("/") != 0) {
+      fprintf(stderr, "[ERR] Failed to chdir to new root: %s\n",
+              strerror(errno));
+      return 1;
+    }
+    // end of new code for step d
+
+    if (mount(NULL, "/proc", "proc", 0, NULL) != 0) {
+      fprintf(stderr, "[ERR] Failed to remount /proc: %s\n", strerror(errno));
+      return 1;
+    }
+
+    if (sethostname(cont.id, 64) != 0) {
+      fprintf(stderr, "[ERR] Failed to set hostname\n");
+      return 1;
+    }
+
+    printf("Running child with pid: %d\n", getpid());
+    if (execl("/bin/sh", "sh", "-c", cont.command, NULL) != 0) {
+      fprintf(stderr, "[ERR] Failed to call create container process: %s\n",
+              strerror(errno));
+      return 1;
+    }
+  }
