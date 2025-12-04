@@ -16,3 +16,9 @@ sudo /tmp/zocker/container/test-container/bin/busybox --install /tmp/zocker/cont
 cd ~/Downloads/zocker-t3/zocker-t3
 
 sudo /tmp/zocker/container/test-container/bin/busybox --install -s /tmp/zocker/container/test-container/bin/
+---
+sudo rm -rf /tmp/zocker/container/test-container
+sudo mkdir -p /tmp/zocker/container/test-container/bin
+sudo cp /bin/busybox /tmp/zocker/container/test-container/bin/
+sudo chmod +x /tmp/zocker/container/test-container/bin/busybox
+sudo /tmp/zocker/container/test-container/bin/busybox --install -s /tmp/zocker/container/test-container/bin/
