@@ -1,0 +1,16 @@
+# Clean old one
+sudo rm -rf /tmp/zocker/container/test-container
+
+# Create new minimal root
+sudo mkdir -p /tmp/zocker/container/test-container/bin
+cd /tmp/zocker/container/test-container/bin
+
+# Download static busybox (contains sh, ls, pwd, mkdir, etc.)
+wget -O busybox https://busybox.net/downloads/binaries/1.36.1/busybox-x86_64
+chmod +x busybox
+
+# Install all applets as symlinks
+./busybox --install .
+
+# Go back
+cd ~/Downloads/zocker-t3/zocker-t3
