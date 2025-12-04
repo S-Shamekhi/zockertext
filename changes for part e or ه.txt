@@ -1,0 +1,25 @@
+    if (chroot(container_dir) != 0) {
+      fprintf(stderr, "[ERR] Failed to chroot to %s: %s\n",
+              container_dir, strerror(errno));
+      return 1;
+    }
+
+    // Make sure we are actually in the new root directory
+    if (chdir("/") != 0) {
+      fprintf(stderr, "[ERR] Failed to chdir to new root: %s\n",
+              strerror(errno));
+      return 1;
+    }
+
+    // --- Step (e) fix: create /proc inside the new root ---
+    if (mkdir("/proc", 0555) == -1 && errno != EEXIST) {
+      fprintf(stderr, "[ERR] Failed to create /proc in new root: %s\n",
+              strerror(errno));
+      return 1;
+    }
+    // ------------------------------------------------------
+
+    if (mount(NULL, "/proc", "proc", 0, NULL) != 0) {
+      fprintf(stderr, "[ERR] Failed to remount /proc: %s\n", strerror(errno));
+      return 1;
+    }
