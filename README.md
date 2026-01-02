@@ -1,4 +1,5 @@
 
+
 rm -rf /tmp/zocker/exported_root
 mkdir -p /tmp/zocker/exported_root
 tar -xf export.tar -C /tmp/zocker/exported_root
@@ -63,3 +64,13 @@ sudo mkdir -p /tmp/zocker/container/test-container/bin
 sudo cp /bin/busybox /tmp/zocker/container/test-container/bin/
 sudo chmod +x /tmp/zocker/container/test-container/bin/busybox
 sudo /tmp/zocker/container/test-container/bin/busybox --install -s /tmp/zocker/container/test-container/bin/
+
+
+
+--------------------------
+
+
+
+googledoc to solve the read only 
+https://docs.google.com/document/d/1_yn_TIo7Wmo74XUY18KlUCWaMOhPOWRyjgz-GaJKc3g/edit?usp=sharing
+
