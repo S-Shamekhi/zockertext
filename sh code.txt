@@ -1,0 +1,113 @@
+cat > /tmp/overlay-lab/build_layers.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOCKERFILE="${1:-Dockerfile.simple}"
+LABROOT="/tmp/overlay-lab"
+
+cd "$LABROOT"
+
+if [[ ! -f "$DOCKERFILE" ]]; then
+  echo "ERROR: Dockerfile not found: $DOCKERFILE" >&2
+  exit 1
+fi
+
+# ---- Parse BASEDIR and RUN commands ----
+BASEDIR=""
+RUN_CMDS=()
+
+while IFS= read -r line; do
+  # trim whitespace
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  [[ -z "$line" ]] && continue
+  [[ "$line" =~ ^# ]] && continue
+
+  if [[ "$line" == BASEDIR\ * ]]; then
+    BASEDIR="${line#BASEDIR }"
+    continue
+  fi
+
+  if [[ "$line" == RUN\ * ]]; then
+    RUN_CMDS+=("${line#RUN }")
+    continue
+  fi
+
+  echo "ERROR: Unsupported line: $line" >&2
+  exit 1
+done < "$DOCKERFILE"
+
+if [[ -z "$BASEDIR" ]]; then
+  echo "ERROR: BASEDIR not found in Dockerfile" >&2
+  exit 1
+fi
+if [[ ! -d "$BASEDIR" ]]; then
+  echo "ERROR: BASEDIR does not exist: $BASEDIR" >&2
+  exit 1
+fi
+if [[ "${#RUN_CMDS[@]}" -eq 0 ]]; then
+  echo "ERROR: No RUN commands found" >&2
+  exit 1
+fi
+
+# Clean only our artifacts
+sudo rm -rf upper* work* merged* final_* 2>/dev/null || true
+
+# LOWERS keeps layers in order: base, then upper0, upper1, ...
+LOWERS=("$BASEDIR")
+
+# ---- Build each RUN as its own upper layer ----
+for i in "${!RUN_CMDS[@]}"; do
+  upper="upper${i}"
+  work="work${i}"
+  merged="merged${i}"
+
+  mkdir -p "$upper" "$work" "$merged"
+
+  # lowerdir must be highest priority first => newest first
+  lowerdir=""
+  for ((k=${#LOWERS[@]}-1; k>=0; k--)); do
+    if [[ -z "$lowerdir" ]]; then
+      lowerdir="${LOWERS[$k]}"
+    else
+      lowerdir="${lowerdir}:${LOWERS[$k]}"
+    fi
+  done
+
+  sudo mount -t overlay overlay \
+    -o "lowerdir=$lowerdir,upperdir=$(pwd)/$upper,workdir=$(pwd)/$work" \
+    "$(pwd)/$merged"
+
+  (cd "$merged" && sudo bash -c "${RUN_CMDS[$i]}")
+
+  sudo umount "$merged"
+
+  # completed upper becomes a new lower for next step
+  LOWERS+=("$(pwd)/$upper")
+done
+
+# ---- Final mount for inspection ----
+# final upper = last layer; final lowers = all previous uppers + base (newest first)
+n="${#RUN_CMDS[@]}"
+final_upper="upper$((n-1))"
+
+final_lowerdir=""
+for ((i=n-2; i>=0; i--)); do
+  if [[ -z "$final_lowerdir" ]]; then
+    final_lowerdir="$(pwd)/upper$i"
+  else
+    final_lowerdir="${final_lowerdir}:$(pwd)/upper$i"
+  fi
+done
+final_lowerdir="${final_lowerdir}:$BASEDIR"
+
+mkdir -p final_work final_merged
+
+sudo mount -t overlay overlay \
+  -o "lowerdir=$final_lowerdir,upperdir=$(pwd)/$final_upper,workdir=$(pwd)/final_work" \
+  "$(pwd)/final_merged"
+
+echo "BUILD COMPLETE"
+echo "Final mounted at: $LABROOT/final_merged"
+EOF
+
